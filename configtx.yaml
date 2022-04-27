@@ -3,32 +3,62 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+# Глоссарий:
+# 1. Membership Service Provider - набор (папка) из сертификатов,
+#     которые позволяют установить связь между сертификатом пользователя
+#     и организацией, к которой он принадлежит. В папке MSP находятся следующий подпапки:
+#     1. admincerts - сертификаты администраторов
+#     2. cacerts - сертификаты центров сертификации
+#
+# 2. Центр сертификации (CA - Certificate Authority) - сервер, который отвечает за учёт пользователей,
+#     выпуск их сертификатов с использованием корневого сертификата центра сертификации. Он хранит всю
+#     информацию о зарегистрированных в организации пользователях.
+#
+# 3. MSPID - уникальный идентификатор Membership Service Provider, позволяет идентифицировать пользователей
+#     внутри сети, с помощью него определяется к какой организации принадлежит пользователь. Так, например,
+#     в сертификате каждого пользователя хранится информация о его MSP ID, которую потом (например, при вызове
+#     функции смарт-контракта) на своей стороне проверяет нода организации и с помощью информации заложенной
+#     в этом файле (configtx.yaml) сопоставляет MSPID пользователя с его организацией.
+#
+# 4. Peer - основная единица в сети HyperLedger Fabric, которая представляет собой сервер, отвечающий
+#     за общение между организациями, синхронизацию блоков, проверку подписей и прочее. Именно он
+#     формирует транзакции и передаёт их в Orderer пир (см. пункт 6).
+#
+# 5. Anchor Peer - пиры (Peer), которые доступны всем организациям в сети для подключения.
+#     Для работы блокчейна, все пиры должны иметь возможность общаться между собой, а значит, они должны
+#     знать путь друг к другу внутри сети. Внутри конфигурации мы указываем Anchor пиры явно, чтобы
+#     все организации имели возможность подключится друг другу, например, для отправки запроса на
+#     подтверждение транзакции (Endorsement)
+#
+# 6. Orderer Peer - пир, который отвечает за формирование порядка блоков внутри канала.
+#     Он не принимает и не обрабатывает транзакции, а следит за сохранением их порядка и отправкой
+#     их внутрь канала, откуда они поступают всем остальным участникам сети (канала).
+#
+# 7. Channel (канал) - основной, главный элемент сети HyperLedger Fabric, который хранит в себе
+#     цепочку блоков. Право на подключение к каналу имеют только те организации, которые были
+#     прописаны внутри профиля канала (см. конец файла).
+#     Пиры организаций получают из всю информацию о блоках, а также синхронизируются
+#     именно через канал.
+
 ---
-################################################################################
-#
-#   Section: Organizations
-#
-#   - This section defines the different organizational identities which will
-#   be referenced later in the configuration.
-#
-################################################################################
 Organizations:
-  # SampleOrg defines an MSP using the sampleconfig.  It should never be used
-  # in production but may be used as a template for other definitions
+  # Orderer будет выступать организацией, которая формирует порядок блоков
   - &OrdererOrg
-    # DefaultOrg defines the organization which is used in the sampleconfig
-    # of the fabric.git development environment
     Name: OrdererOrg
 
-    # ID to load the MSP definition as
     ID: OrdererMSP
 
-    # MSPDir is the filesystem path which contains the MSP configuration
-    MSPDir: ./orgs/orderer/msp
+    # 1. Меняем путь к файлам сертификатов организации (Membership Service Provider - MSP)
+    # Все файлы, касающиеся организаций, у нас будут хранится внутри папки orgs,
+    # поэтому в качестве папки указываем ./orgs/orderer/msp
+    MSPDir: ./orgs/0/msp
 
-    # Policies defines the set of policies at this level of the config tree
-    # For organization policies, their canonical path is usually
-    #   /Channel/<Application|Orderer>/<OrgName>/<PolicyName>
+    # Политики, которые будут использоваться для этой организации
+    # Политики задают необходимые права для выполнения определенных операций,
+    # доступных для организации:
+    # Readers - чтение блокчейна
+    # Writers - запись в блокчейн
+    # Admins - администрирование блокчейна
     Policies:
       Readers:
         Type: Signature
@@ -40,135 +70,160 @@ Organizations:
         Type: Signature
         Rule: "OR('OrdererMSP.admin')"
 
+    # 2. Меняем сетевые пути к ordering-нодам
+    # OrdererEndpoints - сетевые пути к ordering-нодам организации,
+    # и поскольку наши ноды будут работать в локальной сети, мы
+    # должны заменить все адреса указанные в этом файле на соответствующие
+    # локальные адреса.
+    #
+    # Ordering-нода будет работать на нашем первом компьютере (например,
+    # 192.168.21.154), поэтому мы меняем orderer.example.com:7050 на 192.168.21.154:7050
     OrdererEndpoints:
-      - orderer.example.com:7050
+      - 192.168.21.154:7050
 
   - &Org1
-    # DefaultOrg defines the organization which is used in the sampleconfig
-    # of the fabric.git development environment
-    Name: Org1MSP
+    # Название организации - не используется в сети, используется только для
+    # идентификации организации в файле configtx.yaml
+    Name: Users
 
-    # ID to load the MSP definition as
-    ID: Org1MSP
+    # 3. Меняем название организаций с Org1MSP на UsersMSP
+    # MSPID - идентификатор организации, используется внутри сети для идентификации
+    # (см. Глоссарий)
+    ID: UsersMSP
 
-    MSPDir: ./orgs/users/msp
+    # 4. Меняем путь к файлам сертификатов организации (Membership Service Provider - MSP)
+    MSPDir: ./orgs/1/msp
 
-    # Policies defines the set of policies at this level of the config tree
-    # For organization policies, their canonical path is usually
-    #   /Channel/<Application|Orderer>/<OrgName>/<PolicyName>
+    # 5. Меняем политики организации
+    # Политики, которые будут использоваться для этой организации
+    # Поскольку мы делаем тестовую сеть, для упрощения наших задач мы предоставим
+    # Права на запись, чтение и подтверждение транзакций (Endorsement) всем участникам организации.
+    # Для этого везде (кроме Admins) заменяем Rule на "OR('UsersMSP.member')" (поскольку мы изменили
+    # MSPID организации, мы также должны поменять его и в Rule)
     Policies:
       Readers:
         Type: Signature
-        Rule: "OR('Org1MSP.admin', 'Org1MSP.peer', 'Org1MSP.client')"
+        Rule: "OR('UsersMSP.member')"
       Writers:
         Type: Signature
-        Rule: "OR('Org1MSP.admin', 'Org1MSP.client')"
+        Rule: "OR('UsersMSP.member')"
       Admins:
         Type: Signature
-        Rule: "OR('Org1MSP.admin')"
+        Rule: "OR('UsersMSP.admin')"
       Endorsement:
         Type: Signature
-        Rule: "OR('Org1MSP.peer')"
+        Rule: "OR('UsersMSP.member')"
 
-  - &Org2
-    # DefaultOrg defines the organization which is used in the sampleconfig
-    # of the fabric.git development environment
-    Name: Org2MSP
+    # 6. Создаем раздел AnchorPeers (см. Глоссарий)
+    # Поскольку ноды организации Users у нас будут работать на первом компьютере,
+    # в качестве хоста указываем IP адрес первого компьютера в локальной сети
+    AnchorPeers:
+      - Host: 192.168.21.154
+        Port: 9051
 
-    # ID to load the MSP definition as
-    ID: Org2MSP
+  # Приступаем к конфигурированию второй организации
+  - &Org2 # Меняем название организации внутри конфигурации
+    Name: Shops
 
-    MSPDir: ../organizations/peerOrganizations/org2.example.com/msp
+    # 7. Меняем название организации в сети с Org2MSP на ShopsMSP
+    ID: ShopsMSP
 
-    # Policies defines the set of policies at this level of the config tree
-    # For organization policies, their canonical path is usually
-    #   /Channel/<Application|Orderer>/<OrgName>/<PolicyName>
+    # 8. Меняем путь к MSP файлам организации
+    MSPDir: ./orgs/2/msp
+
+    # 9. Меняем политики организации
+    # Точно так же позволяем всем участникам организации читать,
+    # записывать и подтверждать транзакции (Endorsement)
     Policies:
       Readers:
         Type: Signature
-        Rule: "OR('Org2MSP.admin', 'Org2MSP.peer', 'Org2MSP.client')"
+        Rule: "OR('ShopsMSP.member')"
       Writers:
         Type: Signature
-        Rule: "OR('Org2MSP.admin', 'Org2MSP.client')"
+        Rule: "OR('ShopsMSP.member')"
       Admins:
         Type: Signature
-        Rule: "OR('Org2MSP.admin')"
+        Rule: "OR('ShopsMSP.admin')"
       Endorsement:
         Type: Signature
-        Rule: "OR('Org2MSP.peer')"
+        Rule: "OR('ShopsMSP.member')"
 
-################################################################################
+    # 10. Создаем раздел AnchorPeers (см. Глоссарий)
+    # Поскольку ноды организации Shops у нас будут работать на втором компьютере,
+    # в качестве хоста указываем IP адрес второго компьютера в локальной сети (например, 192.168.21.156)
+    AnchorPeers:
+      - Host: 192.168.21.156
+        Port: 9052
+
+  # Приступаем к конфигурированию третьей организации
+  # Копируем Org2
+  - &Org3 # Меняем название организации внутри конфигурации
+    Name: Bank
+
+    # 11. Меняем название организации в сети с Org2MSP на ShopsMSP
+    ID: BankMSP
+
+    # 12. Меняем путь к MSP файлам организации
+    MSPDir: ./orgs/3/msp
+
+    # 13. Меняем политики организации
+    # Точно так же позволяем всем участникам организации читать,
+    # записывать и подтверждать транзакции (Endorsement)
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('BankMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('BankMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('BankMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('BankMSP.member')"
+
+    # 14. Создаем раздел AnchorPeers (см. Глоссарий)
+    # Поскольку ноды организации Shops у нас будут работать на втором компьютере,
+    # в качестве хоста указываем IP адрес второго компьютера в локальной сети (например, 192.168.21.156)
+    AnchorPeers:
+      - Host: 192.168.21.156
+        Port: 9053
+
+# Capabilities указывает возможности каждой части сети
+# Конфигурация сети разделяется на три части:
+#   1. Channel - конфигурация канала (часть сети, хранящая в себе цепочку блоков)
+#   2. Orderer - конфигурация ордерера (часть сети, отвечающая за формирование блоков в каналах)
+#   3. Application - конфигурация пользовательской части сети (в ней происходит деплой контрактов,
+#                    создание и подтверждение транзакций и т.д.)
 #
-#   SECTION: Capabilities
-#
-#   - This section defines the capabilities of fabric network. This is a new
-#   concept as of v1.1.0 and should not be utilized in mixed networks with
-#   v1.0.x peers and orderers.  Capabilities define features which must be
-#   present in a fabric binary for that binary to safely participate in the
-#   fabric network.  For instance, if a new MSP type is added, newer binaries
-#   might recognize and validate the signatures from this type, while older
-#   binaries without this support would be unable to validate those
-#   transactions.  This could lead to different versions of the fabric binaries
-#   having different world states.  Instead, defining a capability for a channel
-#   informs those binaries without this capability that they must cease
-#   processing transactions until they have been upgraded.  For v1.0.x if any
-#   capabilities are defined (including a map with all capabilities turned off)
-#   then the v1.0.x peer will deliberately crash.
-#
-################################################################################
+# Оставляем всё как есть, все три части сети работают на версии 2.0
+# (см. https://hyperledger-fabric.readthedocs.io/en/release-2.2/whatsnew.html)
 Capabilities:
-  # Channel capabilities apply to both the orderers and the peers and must be
-  # supported by both.
-  # Set the value of the capability to true to require it.
   Channel: &ChannelCapabilities
-    # V2_0 capability ensures that orderers and peers behave according
-    # to v2.0 channel capabilities. Orderers and peers from
-    # prior releases would behave in an incompatible way, and are therefore
-    # not able to participate in channels at v2.0 capability.
-    # Prior to enabling V2.0 channel capabilities, ensure that all
-    # orderers and peers on a channel are at v2.0.0 or later.
     V2_0: true
 
-  # Orderer capabilities apply only to the orderers, and may be safely
-  # used with prior release peers.
-  # Set the value of the capability to true to require it.
   Orderer: &OrdererCapabilities
-    # V2_0 orderer capability ensures that orderers behave according
-    # to v2.0 orderer capabilities. Orderers from
-    # prior releases would behave in an incompatible way, and are therefore
-    # not able to participate in channels at v2.0 orderer capability.
-    # Prior to enabling V2.0 orderer capabilities, ensure that all
-    # orderers on channel are at v2.0.0 or later.
     V2_0: true
 
-  # Application capabilities apply only to the peer network, and may be safely
-  # used with prior release orderers.
-  # Set the value of the capability to true to require it.
   Application: &ApplicationCapabilities
-    # V2_0 application capability ensures that peers behave according
-    # to v2.0 application capabilities. Peers from
-    # prior releases would behave in an incompatible way, and are therefore
-    # not able to participate in channels at v2.0 application capability.
-    # Prior to enabling V2.0 application capabilities, ensure that all
-    # peers on channel are at v2.0.0 or later.
     V2_0: true
 
-################################################################################
-#
-#   SECTION: Application
-#
-#   - This section defines the values to encode into a config transaction or
-#   genesis block for application related parameters
-#
-################################################################################
+# Конфигурация пользовательской части сети
 Application: &ApplicationDefaults
-  # Organizations is the list of orgs which are defined as participants on
-  # the application side of the network
+  # Organizations оставим пустым, потому что все организации мы будем
+  # указывать внутри профилей (см. конец файла)
   Organizations:
 
-  # Policies defines the set of policies at this level of the config tree
-  # For Application policies, their canonical path is
-  #   /Channel/Application/<PolicyName>
+  # Политики пользовательской части сети
+  # ImplicitMeta, в отличии Signature, абстрагирует нас от политик внутри
+  # каждой организации и говорит лишь о том, кто именно из владеющих определенными
+  # правами должен произвести действие для его исполнения в сети.
+  #
+  # ANY - любой из владеющих правами;
+  # MAJORITY - все из владеющих правами;
+  #
+  # Для работы нашей сети менять ничего не требуется.
   Policies:
     Readers:
       Type: ImplicitMeta
@@ -188,39 +243,22 @@ Application: &ApplicationDefaults
 
   Capabilities:
     <<: *ApplicationCapabilities
-################################################################################
-#
-#   SECTION: Orderer
-#
-#   - This section defines the values to encode into a config transaction or
-#   genesis block for orderer related parameters
-#
-################################################################################
-Orderer: &OrdererDefaults # Orderer Type: The orderer implementation to start
+
+# Конфигурация ордерера, который отвечает за формирование порядка блоков
+# (см. Глоссарий)
+Orderer: &OrdererDefaults
   OrdererType: solo
   BatchTimeout: 2s
 
-  # Batch Size: Controls the number of messages batched into a block
   BatchSize:
-    # Max Message Count: The maximum number of messages to permit in a batch
     MaxMessageCount: 10
 
-    # Absolute Max Bytes: The absolute maximum number of bytes allowed for
-    # the serialized messages in a batch.
     AbsoluteMaxBytes: 99 MB
 
-    # Preferred Max Bytes: The preferred maximum number of bytes allowed for
-    # the serialized messages in a batch. A message larger than the preferred
-    # max bytes will result in a batch larger than preferred max bytes.
     PreferredMaxBytes: 512 KB
 
-  # Organizations is the list of orgs which are defined as participants on
-  # the orderer side of the network
   Organizations:
 
-  # Policies defines the set of policies at this level of the config tree
-  # For Orderer policies, their canonical path is
-  #   /Channel/Orderer/<PolicyName>
   Policies:
     Readers:
       Type: ImplicitMeta
@@ -231,52 +269,25 @@ Orderer: &OrdererDefaults # Orderer Type: The orderer implementation to start
     Admins:
       Type: ImplicitMeta
       Rule: "MAJORITY Admins"
-    # BlockValidation specifies what signatures must be included in the block
-    # from the orderer for the peer to validate it.
     BlockValidation:
       Type: ImplicitMeta
       Rule: "ANY Writers"
 
-################################################################################
-#
-#   CHANNEL
-#
-#   This section defines the values to encode into a config transaction or
-#   genesis block for channel related parameters.
-#
-################################################################################
 Channel: &ChannelDefaults
-  # Policies defines the set of policies at this level of the config tree
-  # For Channel policies, their canonical path is
-  #   /Channel/<PolicyName>
   Policies:
-    # Who may invoke the 'Deliver' API
     Readers:
       Type: ImplicitMeta
       Rule: "ANY Readers"
-    # Who may invoke the 'Broadcast' API
     Writers:
       Type: ImplicitMeta
       Rule: "ANY Writers"
-    # By default, who may modify elements at this config level
     Admins:
       Type: ImplicitMeta
       Rule: "MAJORITY Admins"
 
-  # Capabilities describes the channel level capabilities, see the
-  # dedicated Capabilities section elsewhere in this file for a full
-  # description
   Capabilities:
     <<: *ChannelCapabilities
 
-################################################################################
-#
-#   Profile
-#
-#   - Different configuration profiles may be encoded here to be specified
-#   as parameters to the configtxgen tool
-#
-################################################################################
 Profiles:
   TwoOrgsApplicationGenesis:
     <<: *ChannelDefaults
