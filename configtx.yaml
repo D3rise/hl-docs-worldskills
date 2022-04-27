@@ -247,7 +247,29 @@ Application: &ApplicationDefaults
 # Конфигурация ордерера, который отвечает за формирование порядка блоков
 # (см. Глоссарий)
 Orderer: &OrdererDefaults
+  # 15. Меняем тип ордерера на solo
+  # Тип (метод) формирования порядка блоков и достижения консенсуса в том,
+  # на каком месте должен стоять тот или иной блок. По умолчанию используется
+  # алгоритм Raft - EtcdRaft (см. https://raft.github.io/), но поскольку мы используем только один
+  # ordering-пир, то мы будем использовать solo.
   OrdererType: solo
+
+  # Сетевые пути к orderer-пирам. Мы удаляем этот раздел, т.к. пути к ним уже
+  # указаны в разделе OrdererEndpoints в конфигурации организации Orderer.
+  #
+  #Addresses:
+  #      - orderer.example.com:7050
+
+  # 16. По умолчанию, здесь должен находиться раздел EtcdRaft, который указывал бы конфигурацию для
+  # алгоритма Raft, но поскольку мы не используем его, то мы удаляем этот раздел конфигурации.
+  #
+  #EtcdRaft:
+  #      Consenters:
+  #      - Host: orderer.example.com
+  #        Port: 7050
+  #        ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  #        ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+
   BatchTimeout: 2s
 
   BatchSize:
@@ -257,8 +279,12 @@ Orderer: &OrdererDefaults
 
     PreferredMaxBytes: 512 KB
 
+  # Здесь указываются организации, которые будут участвовать в формировании
+  # порядка блоков. Мы будем указывать их в профиле системного канала (см. конец файла),
+  # поэтому этот раздел оставляем пустым.
   Organizations:
 
+  # Политики части сети Orderer
   Policies:
     Readers:
       Type: ImplicitMeta
@@ -273,6 +299,7 @@ Orderer: &OrdererDefaults
       Type: ImplicitMeta
       Rule: "ANY Writers"
 
+# Конфигурация канала по-умолчанию
 Channel: &ChannelDefaults
   Policies:
     Readers:
@@ -288,6 +315,8 @@ Channel: &ChannelDefaults
   Capabilities:
     <<: *ChannelCapabilities
 
+# Профили каналов, которые указывают, какая конфигурация будет у тех или иных каналов
+# TODO
 Profiles:
   TwoOrgsApplicationGenesis:
     <<: *ChannelDefaults
