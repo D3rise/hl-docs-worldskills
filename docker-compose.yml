@@ -1,0 +1,364 @@
+# Глоссарий
+#
+# 1. Docker - программа, позволяющая контейнеризировать (изолировать в 
+#     отдельное виртуальное пространство с имитацией необходимого окружения) отдельные программы и приложения,
+#     настраивать их сеть, переменные окружения и т.д.
+#     См. https://docs.docker.com/get-started/
+#
+# 2. Docker Compose - надпрограмма Docker, позволяющая объединять конфигурации многих контейнеров (сервисов)
+#     в единые конфигурационные файлы, с помощью которых управлять их жизненным циклом от создания контейнера до
+#     его удаления становится намного легче.
+#     См. https://docs.docker.com/compose/
+#
+# 3. Image (Образ) - созданный Docker набор программных слоёв (Layers), 
+#     которые становятся фундаментом для наших контейнеров.
+#
+# 4. Gossip - протокол, который позволяет передавать информацию в одноранговой сети путём
+#     её распространения от одного к другому, подобно сплетням.
+#     См. https://ru.wikipedia.org/wiki/Gossip_(протокол)
+
+# Используемые образы:
+# 1. hyperledger/fabric-ca:latest - Для создания центров сертификации (CA)
+# 2. hyperledger/fabric-peer:2.4.2 - Для создания пиров (Peer)
+# 3. hyperledger/fabric-orderer:2.4.2 - Для создания ордереров (Orderer)
+# 4. hyperledger/fabric-tools:2.4.2 - Для создания контейнеров CLI (через них 
+#     мы будем общаться с пирами наших организаций)
+#
+# Остальные необходимые образы (для работы смарт-контрактов) будут автоматически скачены при
+# установке смарт-контракта.
+
+# Используемые порты:
+# 1. 7050 - Orderer
+#
+# 2. 7051 - CA Orderer
+# 3. 7052 - CA Users
+# 4. 7053 - CA Shops
+# 5. 7054 - CA Bank
+#
+# 6. 9051 - Peer Users
+# 7. 9052 - Peer Shops
+# 8. 9053 - Peer Bank
+#
+# 9. 17050 - Operations Orderer (Operations нужен для операций над самим Orderer (или CA, Orderer),
+#            мы не будем напрямую его использовать, однако в конфигурации его нужно указать,
+#            чтобы он не занимал другие порты)
+#
+# 10. 17051 - Operations CA Orderer
+# 11. 17052 - Operations CA Users
+# 12. 17053 - Operations CA Shops
+# 13. 17054 - Operations CA Bank
+#
+# 14. 19051 - Operations Peer Users
+# 15. 19052 - Operations Peer Shops
+# 16. 19053 - Operations Peer Bank
+#
+# 17. 8051 - Chaincode Peer Users (используется для Chaincode-As-An-External-Service, 
+#     см. https://hyperledger-fabric.readthedocs.io/en/release-2.2/cc_service.html)
+# 18. 8052 - Chaincode Peer Shops
+# 19. 8053 - Chaincode Peer Bank
+
+# 0. Указываем версию конфигурации Docker Compose
+version: '3.7'
+
+# Создаем информацию о необходимых сервисах
+# Порядок действий:
+# 1. Копируем конфигурацию отдельных сервисов (вроде CA, Peer, Orderer и CLI) из 
+#     скопированных файлов compose-ca.yaml (для сервиса CA), compose-test-net.yaml (для сервисов Peer, Orderer и CLI)
+# 2. Конфигурируем скопированные сервисы под наши нужды:
+#     * Задаём network_mode: host для всех сервисов, чтобы они могли общаться с нашей локальной сетью
+#     * Меняем переменные окружения (изменяем порты, имена сервисов и т.д.)
+# 3. Копируем созданные конфигурации в том количестве, в котором нам это будет необходимо для создания сети
+#     (4 CA, 3 Peer, 3 CLI и 1 Orderer)
+services:
+  # 1. Копируем конфигурацию ca-org1 из compose-ca.yaml
+  # 2. Изменяем конфигурацию ca-org1 под ca-org0 (CA организации Orderer)
+  # 3. Меняем название с ca_org1 на ca-org0
+  ca-org0:
+    # 1. Указываем используемый образ для контейнера (см. Глоссарий)
+    image: hyperledger/fabric-ca:latest
+    # 2. Удаляем раздел labels, он нам не понадобится
+    #labels:
+    #  service: hyperledger-fabric
+    environment:
+      # 3. Меняем переменную окружения FABRIC_CA_HOME на /hl/ca для нашего удобства
+      - FABRIC_CA_HOME=/hl/ca
+      # 4. Меняем название CA на ca-org0
+      - FABRIC_CA_SERVER_CA_NAME=ca-org0
+      # Удаляем переменную FABRIC_CA_SERVER_TLS_ENABLED, поскольку мы не будем использовать TLS
+      #- FABRIC_CA_SERVER_TLS_ENABLED=true
+      # 5. Меняем порт, который будет прослушивать наш CA на 7051
+      - FABRIC_CA_SERVER_PORT=7051
+      # 6. Меняем прослушиваемый адрес Operations на ${IP}:17051 (${IP} в данном случае будет заменяться
+      # переменной окружения, которую мы будем задавать в наших скриптах)
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=${IP}:17051
+    # 7. Удаляем раздел ports
+    # Раздел ports указывает, какие порты будут пробрасываться из контейнера
+    # на нашу машину, но поскольку мы используем network_mode: host, все прослушиваемые
+    # контейнером порты автоматически будут прослушиваться и нашей машиной
+    #ports:
+    #  - "7054:7054"
+    #  - "17054:17054"
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    # 8. Указываем папки, которые будут передаваться в контейнер
+    # В качестве основной папки для хранения всей необходимой для работы сети информации
+    # мы используем orgs, поэтому она везде будет нашей начальной папкой
+    # Volumes указываются в формате "путь к папке на машине:путь к папке в контейнере"
+    volumes:
+      - ./orgs/ca/0:/hl/ca
+    # 9. Изменяем имя контейнера на ca-org0
+    container_name: ca-org0
+    # 10. Указываем network_mode: host
+    network_mode: host
+
+  # 11. Копируем ca-org0 и переделываем его под конфигурацию ca-org1
+  ca-org1:
+    image: hyperledger/fabric-ca:latest
+    environment:
+      - FABRIC_CA_HOME=/hl/ca
+      # 12. Меняем название CA на ca-org1
+      - FABRIC_CA_SERVER_CA_NAME=ca-org1
+      # 13. Меняем порт, который будет прослушивать наш CA на 7052
+      - FABRIC_CA_SERVER_PORT=7052
+      # 14. Меняем прослушиваемый адрес Operations на ${IP}:17052
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=${IP}:17052
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    # 15. Изменяем ./orgs/ca/0 на ./orgs/ca/1
+    volumes:
+      - ./orgs/ca/1:/hl/ca
+    # 16. Изменяем имя контейнера на ca-org1
+    container_name: ca-org1
+    network_mode: host
+
+  # 17. Копируем ca-org1 и переделываем его под конфигурацию ca-org2
+  ca-org2:
+    image: hyperledger/fabric-ca:latest
+    environment:
+      - FABRIC_CA_HOME=/hl/ca
+      # 18. Меняем название CA на ca-org2
+      - FABRIC_CA_SERVER_CA_NAME=ca-org2
+      # 19. Меняем порт, который будет прослушивать наш CA на 7053
+      - FABRIC_CA_SERVER_PORT=7053
+      # 20. Меняем прослушиваемый адрес Operations на ${IP}:17053
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=${IP}:17053
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    # 21. Изменяем ./orgs/ca/1 на ./orgs/ca/2
+    volumes:
+      - ./orgs/ca/2:/hl/ca
+    # 22. Изменяем имя контейнера на ca-org2
+    container_name: ca-org2
+    network_mode: host
+
+  # 23. Копируем ca-org2 и передылываем его под конфигурацию ca-org3
+  ca-org3:
+    image: hyperledger/fabric-ca:latest
+    environment:
+      - FABRIC_CA_HOME=/hl/ca
+      # 24. Меняем название CA на ca-org3
+      - FABRIC_CA_SERVER_CA_NAME=ca-org3
+      # 25. Меняем порт, который будет прослушивать наш CA на 7054
+      - FABRIC_CA_SERVER_PORT=7054
+      # 26. Меняем прослушиваемый адрес Operations на ${IP}:17054
+      - FABRIC_CA_SERVER_OPERATIONS_LISTENADDRESS=${IP}:17054
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    # 27. Изменяем ./orgs/ca/2 на ./orgs/ca/3
+    volumes:
+      - ./orgs/ca/3:/hl/ca
+    # 28. Изменяем имя контейнера на ca-org3
+    container_name: ca-org3
+    network_mode: host
+
+  # 29. Копируем orderer.example.com из compose-test-net.yaml и переделываем
+  #     его под orderer
+  # 30. Меняем название на orderer для собственного удобства
+  orderer:
+    # 31. Меняем название контейнера на orderer
+    container_name: orderer
+    # 32. Меняем latest на 2.4.2 (latest отсутствует на Docker Hub, поэтому мы должны сами указывать
+    #     нужную нам версию)
+    image: hyperledger/fabric-orderer:2.4.2
+    # 33. Удаляем labels
+    #labels:
+    #  service: hyperledger-fabric
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      # 34. Изменяем прослушиваемый адрес на ${IP} (будет браться из скриптов, которые мы напишем)
+      - ORDERER_GENERAL_LISTENADDRESS=${IP}
+      # Прослушиваемый порт оставляем как есть
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      # 35. Меняем путь к папке MSP на /hl/org/orderer/msp
+      - ORDERER_GENERAL_LOCALMSPDIR=/hl/org/orderer/msp
+      # 36. Удаляем всё что связано с TLS и кластером:
+      #- ORDERER_GENERAL_TLS_ENABLED=true
+      #- ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      #- ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      #- ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      #- ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      #- ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      #- ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      # 37. Меняем Bootstrap Method на file, поскольку мы будем создавать системный канал
+      #     с помощью файла с конфигурацией (создаётся с помощью configtxgen)
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=file
+      # 38. Создаём переменную окружения ORDERER_GENERAL_BOOTSTRAPFILE
+      #     и передаём ей путь к файлу genesis.block (он будет храниться на машине по пути
+      #     ./orgs/0/orderer/genesis.block, соответственно в контейнере он будет доступен по
+      #     пути /hl/org/orderer/genesis.block)
+      # 39. Удаляем ORDERER_CHANNELPARTICIPATION_ENABLED=true (указывает, будет ли Orderer 
+      #     участником пользовательских каналов)
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      # 40. Удаляем всё что связано с ADMIN
+      #- ORDERER_ADMIN_TLS_ENABLED=true
+      #- ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      #- ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      #- ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      #- ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      #- ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+      # 41. Меняем прослушиваемый адрес Operations на ${IP}:17050
+      - ORDERER_OPERATIONS_LISTENADDRESS=${IP}:17050
+      # 42. Мы не используем метрики, поэтому удаляем переменную ORDERER_METRICS_PROVIDER
+      #- ORDERER_METRICS_PROVIDER=prometheus
+    working_dir: /root
+    command: orderer
+    # 43. Меняем Volumes, указываем пути к папке организации
+    volumes:
+        - ./orgs/0:/hl/org
+    # 44. Удаляем раздел ports
+    #ports:
+    #  - 7050:7050
+    #  - 7053:7053
+    #  - 9443:9443
+    # 45. Заменяем раздел networks на network_mode: host
+    #networks:
+    #  - test
+    network_mode: host
+    
+  # 46. Копируем peer0.org1.example.com из compose-test-net.yaml и переделываем его под peer-org1
+  # 47. Меняем название на peer-org1 для собственного удобства
+  peer-org1:
+    # 48. Меняем имя контейнера на peer-org1
+    container_name: peer-org1
+    # 49. Меняем версию с latest на 2.4.2
+    image: hyperledger/fabric-peer:2.4.2
+    # 50. Удаляем раздел labels
+    #labels:
+    #  service: hyperledger-fabric
+    environment:
+      # 51. Удаляем переменную FABRIC_CFG_PATH
+      #- FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      # 52. Удаляем всё что связано с TLS
+      #- CORE_PEER_TLS_ENABLED=true
+      #- CORE_PEER_PROFILE_ENABLED=false
+      #- CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      #- CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      #- CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      # 53. Меняем ID пира на peer-org1
+      - CORE_PEER_ID=peer-org1
+      # 54. Меняем адрес пира на ${IP}:9051 (${IP} будет пробрасываться из 
+      #     наших скриптов, все порты пиров начинаются на 905)
+      - CORE_PEER_ADDRESS=${IP}:9051
+      - CORE_PEER_LISTENADDRESS=${IP}:9051
+      # 55. Меняем адрес для Chaincode as an external service на ${IP}:8051
+      - CORE_PEER_CHAINCODEADDRESS=${IP}:8051
+      # 56. Меняем прослушиваемый адрес для Chaincode as an external service на ${IP}:8051
+      - CORE_PEER_CHAINCODELISTENADDRESS=${IP}:8051
+      # 57. Меняем адрес Gossip (см. Глоссарий) на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_BOOTSTRAP=${IP}:9051
+      # 58. Меняем внешний эндпоинт к Gossip на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9051
+      # 59. Меняем MSPID на UsersMSP
+      # Поскольку первая организация у нас соответствует Users, мы должны изменить Org1MSP на UsersMSP
+      # (ID MSP указанный для организации Users в configtx.yaml)
+      - CORE_PEER_LOCALMSPID=UsersMSP
+      # 60. Меняем путь к MSP на /hl/org/peer/msp
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 61. Меняем прослушиваемый адрес Operations на ${IP}:19051
+      - CORE_OPERATIONS_LISTENADDRESS=${IP}:19051
+      # 62. Удаляем переменную CORE_METRICS_PROVIDER, т.к. мы не используем метрики
+      #- CORE_METRICS_PROVIDER=prometheus
+      # 63. Мы не будем использовать Chaincode-As-A-Service, поэтому 
+      # удаляем переменную CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG_FILE
+      #- CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org1"}
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    # 64. Меняем Volumes для peer-org1
+    volumes:
+        # 65. Для создания контейнеров со смарт-контрактами, пирам нужен доступ к сокету (см. Глоссарий)
+        #     Docker, поэтому мы пробрасываем его внутрь контейнера
+        - /var/run/docker.sock:/var/run/docker.sock
+        # 66. Удаляем оставшиеся переменные окружения и заменяем их на наши:
+        #     1. ./orgs/1 соответствует папке организации
+        #     2. ./orgs/common соответствует папке, общей для всех пиров и CLI
+        #- ../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com:/etc/hyperledger/fabric
+        #- peer0.org1.example.com:/var/hyperledger/production
+        - ./orgs/1:/hl/org
+        - ./orgs/common:/hl/common
+    working_dir: /root
+    command: peer node start
+    # 67. Удаляем раздел ports
+    #ports:
+    #  - 7051:7051
+    #  - 9444:9444
+    # 68. Заменяем раздел networks на network_mode: host
+    #networks:
+    #  - test
+    network_mode: host
+
+  # 69. Копируем peer-org1 и меняем его под peer-org2
+  peer-org2:
+    # 70. Меняем имя контейнера на peer-org2
+    container_name: peer-org2
+    image: hyperledger/fabric-peer:2.4.2
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      # 53. Меняем ID пира на peer-org2
+      - CORE_PEER_ID=peer-org2
+      # 54. Меняем адрес пира на ${IP}:9052
+      - CORE_PEER_ADDRESS=${IP}:9052
+      # 55. Меняем прослушиваемый адрес на ${IP}:9052
+      - CORE_PEER_LISTENADDRESS=${IP}:9052
+      # 55. Меняем адрес для Chaincode as an external service на ${IP}:8051
+      - CORE_PEER_CHAINCODEADDRESS=${IP}:8051
+      # 56. Меняем прослушиваемый адрес для Chaincode as an external service на ${IP}:8051
+      - CORE_PEER_CHAINCODELISTENADDRESS=${IP}:8051
+      # 57. Меняем адрес Gossip (см. Глоссарий) на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_BOOTSTRAP=${IP}:9051
+      # 58. Меняем внешний эндпоинт к Gossip на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9051
+      # 59. Меняем MSPID на UsersMSP
+      # Поскольку первая организация у нас соответствует Users, мы должны изменить Org1MSP на UsersMSP
+      # (ID MSP указанный для организации Users в configtx.yaml)
+      - CORE_PEER_LOCALMSPID=UsersMSP
+      # 60. Меняем путь к MSP на /hl/org/peer/msp
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 61. Меняем прослушиваемый адрес Operations на ${IP}:19051
+      - CORE_OPERATIONS_LISTENADDRESS=${IP}:19051
+      # 62. Удаляем переменную CORE_METRICS_PROVIDER, т.к. мы не используем метрики
+      #- CORE_METRICS_PROVIDER=prometheus
+      # 63. Мы не будем использовать Chaincode-As-A-Service, поэтому 
+      # удаляем переменную CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG_FILE
+      #- CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org1"}
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    # 64. Меняем Volumes для peer-org1
+    volumes:
+        # 65. Для создания контейнеров со смарт-контрактами, пирам нужен доступ к сокету (см. Глоссарий)
+        #     Docker, поэтому мы пробрасываем его внутрь контейнера
+        - /var/run/docker.sock:/var/run/docker.sock
+        # 66. Удаляем оставшиеся переменные окружения и заменяем их на наши:
+        #     1. ./orgs/1 соответствует папке организации
+        #     2. ./orgs/common соответствует папке, общей для всех пиров и CLI
+        #- ../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com:/etc/hyperledger/fabric
+        #- peer0.org1.example.com:/var/hyperledger/production
+        - ./orgs/1:/hl/org
+        - ./orgs/common:/hl/common
+    working_dir: /root
+    command: peer node start
+    # 67. Удаляем раздел ports
+    #ports:
+    #  - 7051:7051
+    #  - 9444:9444
+    # 68. Заменяем раздел networks на network_mode: host
+    #networks:
+    #  - test
+    network_mode: host
