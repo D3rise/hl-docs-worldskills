@@ -312,53 +312,35 @@ services:
     environment:
       - FABRIC_LOGGING_SPEC=INFO
       #- FABRIC_LOGGING_SPEC=DEBUG
-      # 53. Меняем ID пира на peer-org2
+      # 71. Меняем ID пира на peer-org2
       - CORE_PEER_ID=peer-org2
-      # 54. Меняем адрес пира на ${IP}:9052
+      # 72. Меняем адрес пира на ${IP}:9052
       - CORE_PEER_ADDRESS=${IP}:9052
-      # 55. Меняем прослушиваемый адрес на ${IP}:9052
+      # 73. Меняем прослушиваемый адрес на ${IP}:9052
       - CORE_PEER_LISTENADDRESS=${IP}:9052
-      # 55. Меняем адрес для Chaincode as an external service на ${IP}:8051
-      - CORE_PEER_CHAINCODEADDRESS=${IP}:8051
-      # 56. Меняем прослушиваемый адрес для Chaincode as an external service на ${IP}:8051
-      - CORE_PEER_CHAINCODELISTENADDRESS=${IP}:8051
-      # 57. Меняем адрес Gossip (см. Глоссарий) на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
-      - CORE_PEER_GOSSIP_BOOTSTRAP=${IP}:9051
-      # 58. Меняем внешний эндпоинт к Gossip на ${IP}:9051 (должен соответствовать CORE_PEER_LISTENADDRESS)
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9051
-      # 59. Меняем MSPID на UsersMSP
-      # Поскольку первая организация у нас соответствует Users, мы должны изменить Org1MSP на UsersMSP
-      # (ID MSP указанный для организации Users в configtx.yaml)
-      - CORE_PEER_LOCALMSPID=UsersMSP
-      # 60. Меняем путь к MSP на /hl/org/peer/msp
+      # 74. Меняем адрес для Chaincode as an external service на ${IP}:8052
+      - CORE_PEER_CHAINCODEADDRESS=${IP}:8052
+      # 75. Меняем прослушиваемый адрес для Chaincode as an external service на ${IP}:8052
+      - CORE_PEER_CHAINCODELISTENADDRESS=${IP}:8052
+      # 76. Меняем адрес Gossip (см. Глоссарий) на ${IP}:9052 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_BOOTSTRAP=${IP}:9052
+      # 77. Меняем внешний эндпоинт к Gossip на ${IP}:9052 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9052
+      # 78. Меняем MSPID на ShopsMSP
+      # Поскольку вторая организация у нас соответствует Shops, мы должны изменить UsersMSP на ShopsMSP
+      # (ID MSP указанный для организации Shops в configtx.yaml)
+      - CORE_PEER_LOCALMSPID=ShopsMSP
       - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
-      # 61. Меняем прослушиваемый адрес Operations на ${IP}:19051
-      - CORE_OPERATIONS_LISTENADDRESS=${IP}:19051
-      # 62. Удаляем переменную CORE_METRICS_PROVIDER, т.к. мы не используем метрики
-      #- CORE_METRICS_PROVIDER=prometheus
-      # 63. Мы не будем использовать Chaincode-As-A-Service, поэтому 
-      # удаляем переменную CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG_FILE
-      #- CHAINCODE_AS_A_SERVICE_BUILDER_CONFIG={"peername":"peer0org1"}
+      # 80. Меняем прослушиваемый адрес Operations на ${IP}:19052
+      - CORE_OPERATIONS_LISTENADDRESS=${IP}:19052
       - CORE_CHAINCODE_EXECUTETIMEOUT=300s
-    # 64. Меняем Volumes для peer-org1
     volumes:
-        # 65. Для создания контейнеров со смарт-контрактами, пирам нужен доступ к сокету (см. Глоссарий)
-        #     Docker, поэтому мы пробрасываем его внутрь контейнера
         - /var/run/docker.sock:/var/run/docker.sock
-        # 66. Удаляем оставшиеся переменные окружения и заменяем их на наши:
-        #     1. ./orgs/1 соответствует папке организации
-        #     2. ./orgs/common соответствует папке, общей для всех пиров и CLI
-        #- ../organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com:/etc/hyperledger/fabric
-        #- peer0.org1.example.com:/var/hyperledger/production
-        - ./orgs/1:/hl/org
+        # 81. Меняем ./orgs/1 на ./orgs/2
+        - ./orgs/2:/hl/org
         - ./orgs/common:/hl/common
     working_dir: /root
     command: peer node start
-    # 67. Удаляем раздел ports
-    #ports:
-    #  - 7051:7051
-    #  - 9444:9444
-    # 68. Заменяем раздел networks на network_mode: host
-    #networks:
-    #  - test
     network_mode: host
+
+    # TODO
