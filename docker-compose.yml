@@ -343,4 +343,43 @@ services:
     command: peer node start
     network_mode: host
 
-    # TODO
+  # 82. Копируем peer-org2 и меняем его под peer-org3
+  peer-org3:
+    # 83. Меняем имя контейнера на peer-org3
+    container_name: peer-org3
+    image: hyperledger/fabric-peer:2.4.2
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      #- FABRIC_LOGGING_SPEC=DEBUG
+      # 84. Меняем ID пира на peer-org3
+      - CORE_PEER_ID=peer-org3
+      # 85. Меняем адрес пира на ${IP}:9053
+      - CORE_PEER_ADDRESS=${IP}:9053
+      # 86. Меняем прослушиваемый адрес на ${IP}:9053
+      - CORE_PEER_LISTENADDRESS=${IP}:9053
+      # 87. Меняем адрес для Chaincode as an external service на ${IP}:8053
+      - CORE_PEER_CHAINCODEADDRESS=${IP}:8053
+      # 88. Меняем прослушиваемый адрес для Chaincode as an external service на ${IP}:8053
+      - CORE_PEER_CHAINCODELISTENADDRESS=${IP}:8053
+      # 89. Меняем адрес Gossip (см. Глоссарий) на ${IP}:9053 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_BOOTSTRAP=${IP}:9053
+      # 90. Меняем внешний эндпоинт к Gossip на ${IP}:9053 (должен соответствовать CORE_PEER_LISTENADDRESS)
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9053
+      # 91. Меняем MSPID на BankMSP
+      # Поскольку вторая организация у нас соответствует Bank, мы должны изменить ShopsMSP на BankMSP
+      # (ID MSP указанный для организации Bank в configtx.yaml)
+      - CORE_PEER_LOCALMSPID=BankMSP
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 92. Меняем прослушиваемый адрес Operations на ${IP}:19053
+      - CORE_OPERATIONS_LISTENADDRESS=${IP}:19053
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+    volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        # 93. Меняем ./orgs/2 на ./orgs/3
+        - ./orgs/3:/hl/org
+        - ./orgs/common:/hl/common
+    working_dir: /root
+    command: peer node start
+    network_mode: host
+
+  # TODO: доделать документацию по CLI
