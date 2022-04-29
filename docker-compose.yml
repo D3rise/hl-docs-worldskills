@@ -382,4 +382,57 @@ services:
     command: peer node start
     network_mode: host
 
-  # TODO: доделать документацию по CLI
+  # 94. Копируем cli из compose-test-net.yaml и меняем его под cli-org1
+  cli-org1:
+    # 95. Меняем имя контейнера на cli-org1
+    container_name: cli-org1
+    # 96. Меняем версию с latest на 2.4.2
+    image: hyperledger/fabric-tools:2.4.2
+    # 97. Удаляем раздел labels
+    #labels:
+    #  service: hyperledger-fabric
+    tty: true
+    stdin_open: true
+    # 98. Меняем переменные окружения таким образом, чтобы
+    #     контейнер знал, как обращаться к пиру первой организации (Users)
+    environment:
+      - GOPATH=/opt/gopath
+      - FABRIC_LOGGING_SPEC=INFO
+      # 99. Удаляем переменную FABRIC_CFG_PATH, т.к. мы будем конфигурировать
+      #     CLI через переменные окружения
+      #- FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      #- FABRIC_LOGGING_SPEC=DEBUG
+
+      # 100. Устанавливаем переменную CORE_PEER_LOCALMSPID, она должна равняться MSPID той
+      #      организации, которая будет использовать CLI (для первой организации - UsersMSP)
+      - CORE_PEER_LOCALMSPID=UsersMSP
+      # 101. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
+      #      администратора, от имени которого будут выполняться все операции
+      #      /hl/org/ будет браться через volume (см. раздел volumes)
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 102. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
+      #      Для первой организации равняется ${IP}:9051
+      - CORE_PEER_ADDRESS=${IP}:9051
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+        # 103. Удаляем предыдущие volumes
+        #- ../organizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+        #- ../scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/
+        # 104. Добавляем новые volumes (/hl/common - общая папка для всех контейнеров,
+        #      /hl/org - папка организации)
+        - ./orgs/1:/hl/org
+        - ./orgs/common:/hl/common
+        # 105. Пробрасываем сокет Docker внутрь контейнера, чтобы он мог создавать свои контейнеры для
+        #      смарт-контрактов
+        - /var/run/docker.sock:/var/run/docker.sock
+    # 106. Удаляем раздел depends_on, он нам не нужен (см. https://docs.docker.com/compose/compose-file/compose-file-v3/#depends_on)
+    #depends_on:
+    #  - peer0.org1.example.com
+    #  - peer0.org2.example.com
+    # 107. Удаляем раздел networks, т.к. мы будем использовать network_mode: host
+    #networks:
+    #  - test
+    network_mode: host
+    
+    # TODO: сделать документацию по копированию конфигов CLI
