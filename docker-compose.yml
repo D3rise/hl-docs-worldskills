@@ -327,8 +327,8 @@ services:
       # 77. Меняем внешний эндпоинт к Gossip на ${IP}:9052 (должен соответствовать CORE_PEER_LISTENADDRESS)
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9052
       # 78. Меняем MSPID на ShopsMSP
-      # Поскольку вторая организация у нас соответствует Shops, мы должны изменить UsersMSP на ShopsMSP
-      # (ID MSP указанный для организации Shops в configtx.yaml)
+      #     Поскольку вторая организация у нас соответствует Shops, мы должны изменить UsersMSP на ShopsMSP
+      #     (ID MSP указанный для организации Shops в configtx.yaml)
       - CORE_PEER_LOCALMSPID=ShopsMSP
       - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
       # 80. Меняем прослушиваемый адрес Operations на ${IP}:19052
@@ -366,8 +366,8 @@ services:
       # 90. Меняем внешний эндпоинт к Gossip на ${IP}:9053 (должен соответствовать CORE_PEER_LISTENADDRESS)
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=${IP}:9053
       # 91. Меняем MSPID на BankMSP
-      # Поскольку вторая организация у нас соответствует Bank, мы должны изменить ShopsMSP на BankMSP
-      # (ID MSP указанный для организации Bank в configtx.yaml)
+      #     Поскольку вторая организация у нас соответствует Bank, мы должны изменить ShopsMSP на BankMSP
+      #     (ID MSP указанный для организации Bank в configtx.yaml)
       - CORE_PEER_LOCALMSPID=BankMSP
       - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
       # 92. Меняем прослушиваемый адрес Operations на ${IP}:19053
@@ -413,26 +413,88 @@ services:
       # 102. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
       #      Для первой организации равняется ${IP}:9051
       - CORE_PEER_ADDRESS=${IP}:9051
-    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    # 103. Меняем working_dir на /hl/common для собственного удобства (в скриптах не нужно 
+    #      будет писать полный путь к нужным файлам)
+    working_dir: /hl/common
     command: /bin/bash
     volumes:
-        # 103. Удаляем предыдущие volumes
+        # 104. Удаляем предыдущие volumes
         #- ../organizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
         #- ../scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/
-        # 104. Добавляем новые volumes (/hl/common - общая папка для всех контейнеров,
+        # 105. Добавляем новые volumes (/hl/common - общая папка для всех контейнеров,
         #      /hl/org - папка организации)
         - ./orgs/1:/hl/org
         - ./orgs/common:/hl/common
-        # 105. Пробрасываем сокет Docker внутрь контейнера, чтобы он мог создавать свои контейнеры для
+        # 106. Пробрасываем сокет Docker внутрь контейнера, чтобы он мог создавать свои контейнеры для
         #      смарт-контрактов
         - /var/run/docker.sock:/var/run/docker.sock
-    # 106. Удаляем раздел depends_on, он нам не нужен (см. https://docs.docker.com/compose/compose-file/compose-file-v3/#depends_on)
+    # 107. Удаляем раздел depends_on, он нам не нужен (см. https://docs.docker.com/compose/compose-file/compose-file-v3/#depends_on)
     #depends_on:
     #  - peer0.org1.example.com
     #  - peer0.org2.example.com
-    # 107. Удаляем раздел networks, т.к. мы будем использовать network_mode: host
+    # 108. Удаляем раздел networks, т.к. мы будем использовать network_mode: host
     #networks:
     #  - test
     network_mode: host
-    
-    # TODO: сделать документацию по копированию конфигов CLI
+
+  # 109. Копируем cli-org1 и переделываем его под cli-org2
+  cli-org2:
+    # 110. Меняем имя контейнера на cli-org2
+    container_name: cli-org2
+    image: hyperledger/fabric-tools:2.4.2
+    tty: true
+    stdin_open: true
+    # 111. Меняем переменные окружения таким образом, чтобы
+    #     контейнер знал, как обращаться к пиру второй организации (Shops)
+    environment:
+      - GOPATH=/opt/gopath
+      - FABRIC_LOGGING_SPEC=INFO
+      # 112. Устанавливаем переменную CORE_PEER_LOCALMSPID, она должна равняться MSPID той
+      #      организации, которая будет использовать CLI (для второй организации - ShopsMSP)
+      - CORE_PEER_LOCALMSPID=ShopsMSP
+      # 113. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
+      #      администратора, от имени которого будут выполняться все операции
+      #      /hl/org/ будет браться через volume (см. раздел volumes)
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 114. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
+      #      Для второй организации равняется ${IP}:9052
+      - CORE_PEER_ADDRESS=${IP}:9052
+    working_dir: /hl/common
+    command: /bin/bash
+    volumes:
+        # 115. Меняем ./orgs/1 на ./orgs/2
+        - ./orgs/2:/hl/org
+        - ./orgs/common:/hl/common
+        - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
+
+  # 116. Копируем cli-org2 и меняем его под cli-org3
+  cli-org3:
+    # 117. Меняем имя контейнера на cli-org3
+    container_name: cli-org3
+    image: hyperledger/fabric-tools:2.4.2
+    tty: true
+    stdin_open: true
+    # 118. Меняем переменные окружения таким образом, чтобы
+    #      контейнер знал, как обращаться к пиру первой организации (Bank)
+    environment:
+      - GOPATH=/opt/gopath
+      - FABRIC_LOGGING_SPEC=INFO
+      # 119. Устанавливаем переменную CORE_PEER_LOCALMSPID, она должна равняться MSPID той
+      #      организации, которая будет использовать CLI (для третьей организации - BankMSP)
+      - CORE_PEER_LOCALMSPID=BankMSP
+      # 120. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
+      #      администратора, от имени которого будут выполняться все операции
+      #      /hl/org/ будет браться через volume (см. раздел volumes)
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      # 121. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
+      #      Для третьей организации равняется ${IP}:9053
+      - CORE_PEER_ADDRESS=${IP}:9053
+    working_dir: /hl/common
+    command: /bin/bash
+    volumes:
+        # 122. Меняем ./orgs/1 на ./orgs/2
+        - ./orgs/2:/hl/org
+        - ./orgs/common:/hl/common
+        - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
