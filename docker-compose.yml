@@ -231,7 +231,7 @@ services:
     #networks:
     #  - test
     network_mode: host
-    
+
   # 46. Копируем peer0.org1.example.com из compose-test-net.yaml и переделываем его под peer-org1
   # 47. Меняем название на peer-org1 для собственного удобства
   peer-org1:
