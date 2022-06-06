@@ -203,6 +203,7 @@ services:
       #     и передаём ей путь к файлу genesis.block (он будет храниться на машине по пути
       #     ./orgs/0/orderer/genesis.block, соответственно в контейнере он будет доступен по
       #     пути /hl/org/orderer/genesis.block)
+      - ORDERER_GENERAL_BOOTSTRAPFILE=/hl/org/orderer/genesis.block
       # 39. Удаляем ORDERER_CHANNELPARTICIPATION_ENABLED=true (указывает, будет ли Orderer 
       #     участником пользовательских каналов)
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
@@ -409,7 +410,7 @@ services:
       # 101. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
       #      администратора, от имени которого будут выполняться все операции
       #      /hl/org/ будет браться через volume (см. раздел volumes)
-      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/admin/msp
       # 102. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
       #      Для первой организации равняется ${IP}:9051
       - CORE_PEER_ADDRESS=${IP}:9051
@@ -455,7 +456,7 @@ services:
       # 113. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
       #      администратора, от имени которого будут выполняться все операции
       #      /hl/org/ будет браться через volume (см. раздел volumes)
-      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/admin/msp
       # 114. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
       #      Для второй организации равняется ${IP}:9052
       - CORE_PEER_ADDRESS=${IP}:9052
@@ -486,15 +487,15 @@ services:
       # 120. Устанавливаем переменную CORE_PEER_MSPCONFIGPATH, она должна равняться пути к папке MSP
       #      администратора, от имени которого будут выполняться все операции
       #      /hl/org/ будет браться через volume (см. раздел volumes)
-      - CORE_PEER_MSPCONFIGPATH=/hl/org/peer/msp
+      - CORE_PEER_MSPCONFIGPATH=/hl/org/admin/msp
       # 121. Устанавливаем переменную CORE_PEER_ADDRESS, она должна равняться адресу пира
       #      Для третьей организации равняется ${IP}:9053
       - CORE_PEER_ADDRESS=${IP}:9053
     working_dir: /hl/common
     command: /bin/bash
     volumes:
-        # 122. Меняем ./orgs/1 на ./orgs/2
-        - ./orgs/2:/hl/org
+        # 122. Меняем ./orgs/2 на ./orgs/3
+        - ./orgs/3:/hl/org
         - ./orgs/common:/hl/common
         - /var/run/docker.sock:/var/run/docker.sock
     network_mode: host

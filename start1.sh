@@ -21,3 +21,14 @@ docker-compose up -d orderer peer-org1 cli-org1
 sleep 2
 
 # 6. Создаём канал (получаем файл блока)
+docker exec cli-org1 peer channel create -o $IP:7050 -c wsr -f /hl/common/wsr.tx
+
+# 7. Подключаем все организации к созданному каналу (цикл создаётся 
+#    для удобства копирования в start2.sh)
+for i in {1..1}; do
+    # 8. Подключаем канал к организации
+    docker exec cli-org$i peer channel join -b wsr.block
+
+    # 9. Добавляем в канал информацию об Anchor-пирах
+    docker exec cli-org$i peer channel update -o $IP:7050 -c wsr -f /hl/common/anchor$i.tx
+done
